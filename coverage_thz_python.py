@@ -10,7 +10,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 set_up_backend("torch", data_type="float32")
 
 c = sp.constants.c
-p_A = 1e-3                    
+p_A = 1*10e-3                    
 n_A = 10                       
 f   = 0.3e12                   
 k_a = 0.075
@@ -23,10 +23,10 @@ RIS_loc = torch.tensor([1, 1, h_R])
 v_0 = torch.sqrt(torch.tensor([2]))                  
 r_B = 0.22                     
 h_B = 1.63                     
-lambda_B = 4              
+lambda_B = 2              
 lambda_A = 1                  
-g_A = 10**(30/20); g_U = g_A
-tau = 10**(2/20)
+g_A = 10**(30/10); g_U = g_A
+tau = 10**(2/10)
 n   = 1e13            
 n_realizations = 1e6  
 
@@ -55,7 +55,12 @@ def z(r,phi):
 
 xm, ym = poisson_pp(0, 0, R_t, lambda_A)
 
-def calc(lambda_B=lambda_B):
+def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau): 
+    
+    h_B_hat = h_B - h_U
+    h_R_hat = h_R - h_U
+    h_A_hat = h_A - h_U
+
     rho_R, phi_R = cart2pol(torch.tensor([RIS_loc[0]]), torch.tensor([RIS_loc[1]]))
     rho_m, theta_m = cart2pol(xm, ym)
     phi_m = theta_m - phi_R
@@ -66,23 +71,23 @@ def calc(lambda_B=lambda_B):
     x0 = xm[0][index_min.item()].item()
     y0 = ym[0][index_min.item()].item()
     phi0 = phi_m[0][index_min.item()].item()
-    rho_0, theta_0 = cart2pol(torch.tensor([x0]), torch.tensor([y0]))
-    rho_0,theta_0 = rho_0.item(), theta_0.item()
-    beta_D = 2*lambda_B*r_B*abs(h_B/h_A)
-    beta_R = torch.tensor([2*lambda_B*r_B*abs(h_B/h_R)])
-
+    r_0, theta_0 = cart2pol(torch.tensor([x0]), torch.tensor([y0]))
+    r_0,theta_0 = r_0.item(), theta_0.item()
+    beta_D = torch.tensor([2*lambda_B*r_B*abs(h_B_hat/h_A_hat)])
+    beta_R = torch.tensor([2*lambda_B*r_B*abs(h_B_hat/h_R_hat)])
+    #print(r_0)
     pdLOS = lambda r : torch.exp(-1*beta_D*r)
     prLOS = torch.exp(-1*beta_R*v_0)
 
     def pld(r):
         if not torch.is_tensor(r):
             r = torch.tensor([r])
-        return (g_U*g_A*c**2/(4*torch.pi*f)**2)*torch.exp(-k_a*torch.sqrt(r**2+h_A**2))*1/(r**2+h_A**2)
+        return (g_U*g_A*c**2/(4*torch.pi*f)**2)*torch.exp(-k_a*torch.sqrt(r**2+h_A_hat**2))*1/(r**2+h_A_hat**2)
 
     def plr(z):
         if not torch.is_tensor(z):
             z = torch.tensor([z])
-        return (g_U*g_A*(lX*lY)**2 / ((4*torch.pi)**2 * (z**2 + (h_A-h_R)**2) * (v_0**2+h_R**2))) * torch.exp(-1*k_a*torch.sqrt(z**2+(h_A-h_R)**2)) * torch.exp(-1*k_a*torch.sqrt(v_0**2+h_R**2)) * (h_A-h_R)**2/(z**2+(h_A-h_R)**2)
+        return (g_U*g_A*(lX*lY)**2 / ((4*torch.pi)**2 * (z**2 + (h_A_hat-h_R_hat)**2) * (v_0**2+(h_R_hat)**2))) * torch.exp(-1*k_a*torch.sqrt(z**2+(h_A_hat-h_R_hat)**2)) * torch.exp(-1*k_a*torch.sqrt(v_0**2+(h_R_hat)**2)) * (h_A_hat-h_R_hat)**2/(z**2+(h_A_hat-h_R_hat)**2)
 
     aD = lambda r : torch.exp(-beta_D*r)*(1-torch.exp(-beta_R*v_0))
     aR = lambda r : (1-torch.exp(-1*beta_D*r))*torch.exp(-1*beta_R*v_0)
@@ -102,10 +107,10 @@ def calc(lambda_B=lambda_B):
 
     simp = Simpson()
 
-    lID = lambda s : torch.exp(-2*torch.pi*lambda_A*simp.integrate(lambda r : integ_func_L_ID(r,s),dim=1,N=9999,integration_domain=[[rho_0,R_t]]))
+    lID = lambda s : torch.exp(-2*torch.pi*lambda_A*simp.integrate(lambda r : integ_func_L_ID(r,s),dim=1,N=501,integration_domain=[[r_0,R_t]]))
 
-    def lIR(s,N=79**2):
-        integration_domain = [[rho_0,R_t],[0,torch.pi]]
+    def lIR(s,N=121**2):
+        integration_domain = [[r_0,R_t],[0,torch.pi]]
         integrand = lambda d: integ_func_L_IR(d[:,0],d[:,1],s)
         return torch.exp(-2*torch.pi*lambda_A*simp.integrate(integrand,dim=2,N=N,integration_domain=integration_domain))
 
@@ -113,6 +118,8 @@ def calc(lambda_B=lambda_B):
         if not torch.is_tensor(r):
             r = torch.tensor([r])
         return lID(tau*k_D/(p_A*pld(r)))
+
+    #print(pD(r_0));raise()
 
     def pR(r,phi):
         if not torch.is_tensor(r):
@@ -128,10 +135,10 @@ def calc(lambda_B=lambda_B):
             phi = torch.tensor([phi])
         return lID(tau*k_C(r,z(r,phi)))*lIR(tau*k_C(r,z(r,phi)))
 
-    g = lambda r : 2*torch.pi*lambda_A*r*torch.exp(-1*lambda_A*torch.pi*r**2)
+    g = lambda r : 2*torch.pi*lambda_A*r*torch.exp(-lambda_A*torch.pi*r**2)
     integ_func_P_cov = lambda r,phi,active_D,active_R,active_C : g(r)*(active_D*aD(r)*pD(r) + active_R*aR(r)*pR(r,phi) + active_C*aC(r)*pC(r,phi))
 
-    def solve(active_D,active_R,active_C,N=79**2):
+    def solve(active_D,active_R,active_C,N=121**2):
         integration_domain = [[0,R_t],[0,torch.pi]]
         integrand = lambda d : integ_func_P_cov(d[:,0], d[:,1],active_D,active_R,active_C)
         return (1/torch.pi)*simp.integrate(integrand,dim=2,N=N,integration_domain=integration_domain)
@@ -142,15 +149,41 @@ def calc(lambda_B=lambda_B):
     P_covOverall = solve(1,1,1)
     return (P_covD, P_covR, P_covC, P_covOverall)
 
+# FIGURA 2(b) #######################################################################
 b_lambdas = torch.arange(2,20,0.5)
 results = torch.tensor([calc(torch.tensor([l])) for l in b_lambdas])
 results_D = results[:,0]
 results_R = results[:,1]
 results_C = results[:,2]
 results_overall = results[:,3]
-
 plt.plot(b_lambdas.cpu(), results_D.cpu())
 plt.plot(b_lambdas.cpu(), results_R.cpu())
 plt.plot(b_lambdas.cpu(), results_C.cpu())
 plt.plot(b_lambdas.cpu(), results_overall.cpu())
 plt.show()
+
+# FIGURA 3(a) #######################################################################
+# v0s = torch.arange(0.25,6,0.5)
+# results8 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.8*h_A) for l in v0s])
+# results7 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.7*h_A) for l in v0s])
+# results6 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.6*h_A) for l in v0s])
+# results_overall8 = results8[:,3]
+# results_overall7 = results7[:,3]
+# results_overall6 = results6[:,3]
+# plt.plot(v0s.cpu(), results_overall8.cpu())
+# plt.plot(v0s.cpu(), results_overall7.cpu())
+# plt.plot(v0s.cpu(), results_overall6.cpu())
+# plt.show()
+
+# FIGURA 3(b) #######################################################################
+# lAs = torch.arange(1,10,0.5)
+# results2 = torch.tensor([calc(lambda_A=torch.tensor([l]),tau=10**(2/20)) for l in lAs])
+# results4 = torch.tensor([calc(lambda_A=torch.tensor([l]),tau=10**(4/20)) for l in lAs])
+# results6 = torch.tensor([calc(lambda_A=torch.tensor([l]),tau=10**(6/20)) for l in lAs])
+# results_overall2 = results2[:,3]
+# results_overall4 = results4[:,3]
+# results_overall6 = results6[:,3]
+# plt.plot(lAs.cpu(), results_overall2.cpu())
+# plt.plot(lAs.cpu(), results_overall4.cpu())
+# plt.plot(lAs.cpu(), results_overall6.cpu())
+# plt.show()
