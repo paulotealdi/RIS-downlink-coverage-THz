@@ -154,42 +154,42 @@ def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau, n=n, h
     return (P_covD, P_covR, P_covC, P_covOverall)
 
 # FIGURA 2(b) #######################################################################
-# b_lambdas = torch.arange(1,20,0.5)
-# results = torch.tensor([calc(torch.tensor([l])) for l in b_lambdas])
-# results_D = results[:,0]
-# results_R = results[:,1]
-# results_C = results[:,2]
-# results_overall = results[:,3]
-# # plt.subplot(2,2,1)
-# plt.plot(b_lambdas.cpu(), results_D.cpu(), color="blue")
-# plt.plot(b_lambdas.cpu(), results_R.cpu(), color="red")
-# plt.plot(b_lambdas.cpu(), results_C.cpu(), color="orange")
-# plt.plot(b_lambdas.cpu(), results_overall.cpu(), color="purple")
-# plt.legend(["Direct","RIS","Composite","Overall"])
-# plt.xlabel("Densidade de bloqueios λB (bloqueios/m2)")
-# plt.ylabel("Probabilidades de cobertura")
-# plt.margins(0)
-# plt.grid()
-# plt.show()
-
-# FIGURA 3(a) #######################################################################
-v0s = torch.arange(0.25,6,0.2)
-results8 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.8*h_A) for l in v0s])
-results7 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.7*h_A) for l in v0s])
-results6 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.6*h_A) for l in v0s])
-results_overall8 = results8[:,3]
-results_overall7 = results7[:,3]
-results_overall6 = results6[:,3]
-# plt.subplot(2,2,2)
-plt.plot(v0s.cpu(), results_overall8.cpu(), color="blue")
-plt.plot(v0s.cpu(), results_overall7.cpu(), color="red")
-plt.plot(v0s.cpu(), results_overall6.cpu(), color="orange")
-plt.legend(["hR = 0.8 hA","hR = 0.7 hA","hR = 0.6 hA"])
-plt.xlabel("Distância v0 UE-RIS (m)")
+b_lambdas = torch.arange(1,20,0.5)
+results = torch.tensor([calc(torch.tensor([l])) for l in b_lambdas])
+results_D = results[:,0]
+results_R = results[:,1]
+results_C = results[:,2]
+results_overall = results[:,3]
+# plt.subplot(2,2,1)
+plt.plot(b_lambdas.cpu(), results_D.cpu(), color="blue")
+plt.plot(b_lambdas.cpu(), results_R.cpu(), color="red")
+plt.plot(b_lambdas.cpu(), results_C.cpu(), color="orange")
+plt.plot(b_lambdas.cpu(), results_overall.cpu(), color="purple")
+plt.legend(["Direct","RIS","Composite","Overall"])
+plt.xlabel("Densidade de bloqueios λB (bloqueios/m2)")
 plt.ylabel("Probabilidades de cobertura")
 plt.margins(0)
 plt.grid()
 plt.show()
+
+# FIGURA 3(a) #######################################################################
+# v0s = torch.arange(0.25,6,0.2)
+# results8 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.8*h_A) for l in v0s])
+# results7 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.7*h_A) for l in v0s])
+# results6 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.6*h_A) for l in v0s])
+# results_overall8 = results8[:,3]
+# results_overall7 = results7[:,3]
+# results_overall6 = results6[:,3]
+# # plt.subplot(2,2,2)
+# plt.plot(v0s.cpu(), results_overall8.cpu(), color="blue")
+# plt.plot(v0s.cpu(), results_overall7.cpu(), color="red")
+# plt.plot(v0s.cpu(), results_overall6.cpu(), color="orange")
+# plt.legend(["hR = 0.8 hA","hR = 0.7 hA","hR = 0.6 hA"])
+# plt.xlabel("Distância v0 UE-RIS (m)")
+# plt.ylabel("Probabilidades de cobertura")
+# plt.margins(0)
+# plt.grid()
+# plt.show()
 
 # FIGURA 3(b) #######################################################################
 # lAs = torch.arange(0.5,11,1)
@@ -222,43 +222,4 @@ plt.show()
 # plt.xlabel("Número de elementos da RIS (em 10^x)")
 # plt.ylabel("Probabilidades de cobertura")
 # plt.grid()
-# plt.show()
-
-# results_D = results[:,0]
-# beta_D_values = results[:,4]
-# pdLOS_values = results[:,5]
-# pD_values = results[:,6]
-
-# # Generating the plots
-# plt.figure(figsize=(14, 10))
-
-# plt.subplot(2, 2, 1)
-# plt.plot(b_lambdas.cpu(), results_D.cpu(), label='P_covD')
-# plt.grid()
-# plt.title('P_covD vs. Lambda_B')
-# plt.xlabel('Lambda_B')
-# plt.ylabel('P_covD')
-
-# plt.subplot(2, 2, 2)
-# plt.plot(b_lambdas.cpu(), beta_D_values.cpu(), label='Beta_D', color='orange')
-# plt.grid()
-# plt.title('Beta_D vs. Lambda_B')
-# plt.xlabel('Lambda_B')
-# plt.ylabel('Beta_D')
-
-# plt.subplot(2, 2, 3)
-# plt.plot(b_lambdas.cpu(), pdLOS_values.cpu(), label='pdLOS(r_0)', color='green')
-# plt.grid()
-# plt.title('pdLOS(r_0) vs. Lambda_B')
-# plt.xlabel('Lambda_B')
-# plt.ylabel('pdLOS(r_0)')
-
-# plt.subplot(2, 2, 4)
-# plt.plot(b_lambdas.cpu(), pD_values.cpu(), label='pD(r_0)', color='red')
-# plt.grid()
-# plt.title('pD(r_0) vs. Lambda_B')
-# plt.xlabel('Lambda_B')
-# plt.ylabel('pD(r_0)')
-
-# plt.tight_layout()
 # plt.show()
