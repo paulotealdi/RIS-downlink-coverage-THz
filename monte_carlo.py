@@ -6,23 +6,23 @@ import numpy as np
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 c = sp.constants.c
-n_A = 10                       
+n_A = 10
 f   = 0.3e12
 kA = 0.075
 R_t = torch.sqrt(torch.tensor([140]))
-h_A = 3                        
-h_U = 1                        
+h_A = 3
+h_U = 1
 h_R = 0.75*h_A
 ris_loc = torch.tensor([1, 1, h_R])
-v_0 = torch.sqrt(torch.tensor([2]))                  
-r_B = 0.22                     
-h_B = 1.63                     
-lambda_B = 2              
+v_0 = torch.sqrt(torch.tensor([2]))
+r_B = 0.22
+h_B = 1.63
+lambda_B = 2
 lambda_A = 1
 gU = 10**(30/10)
 gA = gU
 tau = 10**(2/10)
-n   = 1e13            
+n   = 1e13
 n_realizations = 450
 lX  = c/(2*f); lY = lX
 

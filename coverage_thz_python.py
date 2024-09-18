@@ -13,7 +13,7 @@ set_up_backend("torch", data_type="float32")
 c = sp.constants.c
 p_A = 1e-3
 n_A = 10
-f   = 0.3*1e12
+f   = 0.3e12
 k_a = 0.075
 lX  = c/(2*f); lY = lX
 R_t = torch.sqrt(torch.tensor([140]))
@@ -25,7 +25,7 @@ v_0 = torch.sqrt(torch.tensor([2]))
 r_B = 0.22
 h_B = 1.63
 lambda_B = 2
-lambda_A = 0.08
+lambda_A = 1
 g_A = 10**(30/10); g_U = g_A
 tau = 10**(2/10)
 n   = 1e13
@@ -51,45 +51,39 @@ def poisson_pp(xx0, yy0, radius, lambda0):
     xx=xx+xx0; yy=yy+yy0
     return (xx,yy)
 
-def z(r,phi):
-    return torch.sqrt(r**2+v_0**2-2*r*v_0*torch.cos(phi))
+# xm, ym = poisson_pp(0, 0, R_t, lambda_A) # To generate a poisson point process realization
 
-def hvs(x):
+def hvs(x,r):
+    x = x - r
     if not torch.is_tensor(x):
         x = torch.tensor([x])
     return torch.heaviside(x,torch.tensor([1.]))
 
-xm, ym = poisson_pp(0, 0, R_t, lambda_A)
-rho_R, phi_R = cart2pol(torch.tensor([RIS_loc[0]]), torch.tensor([RIS_loc[1]]))
-rho_m, theta_m = cart2pol(xm, ym)
-phi_m = theta_m - phi_R
-
-def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau, n=n, h_B=h_B): 
+def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau, n=n, h_B=h_B, activeRIS=False): 
     h_B_hat = h_B - h_U
     h_R_hat = h_R - h_U
     h_A_hat = h_A - h_U
 
-    distances_UA = torch.sqrt(xm**2 + ym**2)
-    index_min = torch.argmin(distances_UA)
-    x0 = xm[0][index_min.item()].item()
-    y0 = ym[0][index_min.item()].item()
-    r_0, theta_0 = cart2pol(torch.tensor([x0]), torch.tensor([y0]))
-    r_0,theta_0 = r_0.item(), theta_0.item()
     beta_D = torch.tensor([2*lambda_B*r_B*abs(h_B_hat/h_A_hat)])
     beta_R = torch.tensor([2*lambda_B*r_B*abs(h_B_hat/h_R_hat)])
 
     pdLOS = lambda r : torch.exp(-beta_D*r)
     prLOS = torch.exp(-beta_R*v_0)
 
+    def z(r,phi):
+        return torch.sqrt(r**2+v_0**2-2*r*v_0*torch.cos(phi))
+
     def pld(r):
         if not torch.is_tensor(r):
             r = torch.tensor([r])
-        return (g_U*g_A*c**2/(4*torch.pi*f)**2)*torch.exp(-k_a*torch.sqrt(r**2+h_A_hat**2))/(r**2+h_A_hat**2)
+        return ((g_U*g_A*c**2)/(4*torch.pi*f)**2)*torch.exp(-k_a*torch.sqrt(r**2+h_A_hat**2))/(r**2+h_A_hat**2)
 
     def plr(z):
         if not torch.is_tensor(z):
             z = torch.tensor([z])
-        return (g_U*g_A*(lX*lY)**2 / ((4*torch.pi)**2 * (z**2 + (h_A_hat-h_R_hat)**2) * (v_0**2+(h_R_hat)**2))) * torch.exp(-k_a*torch.sqrt(z**2+(h_A_hat-h_R_hat)**2)) * torch.exp(-k_a*torch.sqrt(v_0**2+(h_R_hat)**2)) * (h_A_hat-h_R_hat)**2/(z**2+(h_A_hat-h_R_hat)**2)
+        if activeRIS:
+            return ((10**(30/10))*g_U*g_A*(lX*lY)**2 / ((4*torch.pi)**2 * (z**2 + (h_A_hat-h_R_hat)**2) * (v_0**2+(h_R_hat)**2))) * torch.exp(-k_a*torch.sqrt(z**2+(h_A_hat-h_R_hat)**2)) * torch.exp(-k_a*torch.sqrt(v_0**2+(h_R_hat)**2)) * (h_A_hat-h_R_hat)**2/(z**2+(h_A_hat-h_R_hat)**2)
+        return ((g_U*g_A*(lX*lY)**2) / ((4*torch.pi)**2 * (z**2 + (h_A_hat-h_R_hat)**2) * (v_0**2+(h_R_hat)**2))) * torch.exp(-k_a*torch.sqrt(z**2+(h_A_hat-h_R_hat)**2)) * torch.exp(-k_a*torch.sqrt(v_0**2+(h_R_hat)**2)) * (h_A_hat-h_R_hat)**2/(z**2+(h_A_hat-h_R_hat)**2)
 
     aD = lambda r : torch.exp(-beta_D*r)*(1-torch.exp(-beta_R*v_0))
     aR = lambda r : (1-torch.exp(-1*beta_D*r))*torch.exp(-1*beta_R*v_0)
@@ -111,12 +105,12 @@ def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau, n=n, h
 
     def lID(s,r0,N=701):
         integration_domain = [[0, R_t]] # heaviside "hvs(r)" takes care of the integration domain
-        integral = simp.integrate(lambda r : integ_func_L_ID(r,s)*hvs(r0),dim=1,N=N,integration_domain=integration_domain)
+        integral = simp.integrate(lambda r : integ_func_L_ID(r,s)*hvs(r0,r),dim=1,N=N,integration_domain=integration_domain)
         return torch.exp(-2*torch.pi*lambda_A*integral)
-
-    def lIR(s,r0,N=71**2):
+        
+    def lIR(s,r0,N=101**2):
         integration_domain = [[0,R_t],[0,torch.pi]] # heaviside "hvs(r)" takes care of the integration domain
-        integrand = lambda d: integ_func_L_IR(d[:,0],d[:,1],s)*hvs(r0)
+        integrand = lambda d: integ_func_L_IR(d[:,0],d[:,1],s)*hvs(r0,d[:,0])
         return torch.exp(-2*torch.pi*lambda_A*simp.integrate(integrand,dim=2,N=N,integration_domain=integration_domain))
 
     def pD(r):
@@ -142,7 +136,7 @@ def calc(lambda_B=lambda_B, lambda_A=lambda_A, v_0=v_0, h_R=h_R, tau=tau, n=n, h
     g = lambda r : 2*torch.pi*lambda_A*r*torch.exp(-lambda_A*torch.pi*r**2)
     integ_func_P_cov = lambda r,phi,active_D,active_R,active_C : g(r)*(active_D*aD(r)*pD(r) + active_R*aR(r)*pR(r,phi) + active_C*aC(r)*pC(r,phi))
 
-    def solve(active_D,active_R,active_C,N=71**2):
+    def solve(active_D,active_R,active_C,N=101**2):
         integration_domain = [[0,R_t],[0,torch.pi]]
         integrand = lambda d : integ_func_P_cov(d[:,0], d[:,1],active_D,active_R,active_C)
         return (1/torch.pi)*simp.integrate(integrand,dim=2,N=N,integration_domain=integration_domain)
@@ -160,7 +154,6 @@ results_D = results[:,0]
 results_R = results[:,1]
 results_C = results[:,2]
 results_overall = results[:,3]
-# plt.subplot(2,2,1)
 plt.plot(b_lambdas.cpu(), results_D.cpu(), color="blue")
 plt.plot(b_lambdas.cpu(), results_R.cpu(), color="red")
 plt.plot(b_lambdas.cpu(), results_C.cpu(), color="orange")
@@ -173,7 +166,7 @@ plt.grid()
 plt.show()
 
 # FIGURA 3(a) #######################################################################
-# v0s = torch.arange(0.25,6,0.2)
+# v0s = torch.arange(0.25,6.5,0.5)
 # results8 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.8*h_A) for l in v0s])
 # results7 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.7*h_A) for l in v0s])
 # results6 = torch.tensor([calc(v_0=torch.tensor([l]),h_R=0.6*h_A) for l in v0s])
@@ -210,16 +203,29 @@ plt.show()
 # plt.show()
 
 # FIGURA 3(c) #######################################################################
-# nRIS = torch.tensor([1e8, 1e9, 1e10, 1e11, 1e12, 1e13])
-# results1 = torch.tensor([calc(n=n_elm,h_B=1.1) for n_elm in nRIS])
-# results2 = torch.tensor([calc(n=n_elm,h_B=1.6) for n_elm in nRIS])
+# nRIS = torch.logspace(2,15,40)
+# results1 = torch.tensor([calc(n=n_elm,h_B=1.1,activeRIS=True) for n_elm in nRIS])
+# results2 = torch.tensor([calc(n=n_elm,h_B=1.6,activeRIS=True) for n_elm in nRIS])
+# results3 = torch.tensor([calc(n=n_elm,h_B=1.1) for n_elm in nRIS])
+# results4 = torch.tensor([calc(n=n_elm,h_B=1.6) for n_elm in nRIS])
+# results5 = torch.tensor([calc(n=n_elm,h_B=1.1) for n_elm in nRIS])
+# results6 = torch.tensor([calc(n=n_elm,h_B=1.6) for n_elm in nRIS])
 # results_overall1 = results1[:,3]
 # results_overall2 = results2[:,3]
+# results_overall3 = results3[:,3]
+# results_overall4 = results4[:,3]
+# results_overall5 = results5[:,0]
+# results_overall6 = results6[:,0]
 # # plt.subplot(2,2,3)
-# plt.plot(nRIS.cpu(), results_overall1.cpu(), color="blue")
-# plt.plot(nRIS.cpu(), results_overall2.cpu(), color="red")
-# plt.legend(["hB = 1.1 m","hB = 1.6 m"])
-# plt.xlabel("Número de elementos da RIS (em 10^x)")
+# plt.plot(nRIS.cpu(), results_overall1.cpu(), color="blue", linestyle='--', marker='o')
+# plt.plot(nRIS.cpu(), results_overall2.cpu(), color="blue")
+# plt.plot(nRIS.cpu(), results_overall3.cpu(), color="red", linestyle='--', marker='o')
+# plt.plot(nRIS.cpu(), results_overall4.cpu(), color="red")
+# plt.plot(nRIS.cpu(), results_overall5.cpu(), color="orange", linestyle='--', marker='o')
+# plt.plot(nRIS.cpu(), results_overall6.cpu(), color="orange")
+# plt.legend(["Active hB = 1.1 m","Active hB = 1.6 m","Passive hB = 1.1 m","Passive hB = 1.6 m","No RIS hB = 1.1 m","No RIS hB = 1.6 m"])
+# plt.xlabel("Número de elementos da RIS")
 # plt.ylabel("Probabilidades de cobertura")
+# plt.xscale('log')
 # plt.grid()
 # plt.show()
